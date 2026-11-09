@@ -1,0 +1,45 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    function signedIn() {
+      return request.auth != null;
+    }
+
+    function validRole(role) {
+      return role in ['store', 'courier'];
+    }
+
+    match /users/{userId} {
+      allow create: if signedIn()
+        && request.auth.uid == userId
+        && request.resource.data.uid == userId
+        && request.resource.data.email == request.auth.token.email
+        && validRole(request.resource.data.role)
+        && request.resource.data.status == 'pending'
+        && request.resource.data.available == false
+        && request.resource.data.city == 'Horizonte'
+        && request.resource.data.state == 'CE'
+        && request.resource.data.keys().hasOnly([
+          'uid', 'name', 'phone', 'email', 'role', 'city', 'state',
+          'status', 'available', 'createdAt'
+        ]);
+
+      allow read: if signedIn() && request.auth.uid == userId;
+
+      // O usuário pode alterar apenas nome e telefone.
+      // Papel, aprovação e disponibilidade ficam reservados ao backend/admin.
+      allow update: if signedIn()
+        && request.auth.uid == userId
+        && request.resource.data.diff(resource.data).affectedKeys()
+          .hasOnly(['name', 'phone']);
+
+      allow delete: if false;
+    }
+
+    // As coleções de corridas serão liberadas após implementar
+    // as regras de atribuição atômica e validação por Cloud Functions.
+    match /deliveries/{deliveryId} {
+      allow read, write: if false;
+    }
+  }
+}

@@ -1,0 +1,298 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="theme-color" content="#123b2d">
+  <meta name="description" content="Horizonte Entregas — conectando lojas e entregadores em Horizonte, Ceará.">
+  <title>Horizonte Entregas</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700;800&family=Manrope:wght@600;700;800&display=swap" rel="stylesheet">
+  <style>
+    :root{--green:#176b49;--green2:#21865b;--dark:#123b2d;--mint:#e9f5ee;--bg:#f5f8f5;--ink:#17251e;--muted:#718078;--line:#e2eae4;--white:#fff;--red:#b42318}
+    *{box-sizing:border-box}body{margin:0;background:var(--bg);color:var(--ink);font-family:"DM Sans",sans-serif}
+    button,input,select{font:inherit}button{cursor:pointer}
+    .top{height:72px;background:#fff;border-bottom:1px solid var(--line);display:flex;align-items:center;justify-content:space-between;padding:0 max(5vw,20px);position:sticky;top:0;z-index:5}
+    .brand{display:flex;align-items:center;gap:10px;font-family:Manrope,sans-serif;font-weight:800;color:var(--dark);letter-spacing:-.5px}
+    .logo{width:40px;height:40px;border-radius:13px;background:var(--dark);color:#fff;display:grid;place-items:center;font-size:21px}
+    .brand small{display:block;font:600 10px "DM Sans";letter-spacing:1.6px;color:var(--green2);margin-top:1px}
+    .top-actions{display:flex;gap:10px}.btn{border:0;border-radius:12px;padding:12px 17px;font-weight:700;transition:.2s}
+    .btn-primary{background:var(--green);color:#fff}.btn-primary:hover{background:var(--dark);transform:translateY(-1px)}
+    .btn-light{background:var(--mint);color:var(--dark)}.btn-outline{background:#fff;border:1px solid var(--line);color:var(--dark)}
+    .hero{background:linear-gradient(120deg,#103b2b 0%,#176b49 65%,#25885c 100%);color:#fff;padding:74px max(7vw,24px) 78px;position:relative;overflow:hidden}
+    .hero:after{content:"";position:absolute;width:440px;height:440px;border:1px solid #ffffff20;border-radius:50%;right:-80px;top:-170px;box-shadow:0 0 0 45px #ffffff08,0 0 0 95px #ffffff06}
+    .hero-inner{max-width:1120px;margin:auto;position:relative;z-index:1}
+    .eyebrow{display:inline-flex;gap:8px;align-items:center;border:1px solid #ffffff40;background:#ffffff12;border-radius:30px;padding:8px 13px;font-size:12px;font-weight:700;letter-spacing:.5px}
+    .dot{width:8px;height:8px;background:#8ce0ad;border-radius:50%}
+    h1,h2,h3{font-family:Manrope,sans-serif;letter-spacing:-1px}h1{font-size:clamp(38px,6vw,66px);line-height:1.04;max-width:700px;margin:22px 0 16px}
+    .hero p{font-size:17px;line-height:1.7;color:#e0eee6;max-width:580px;margin:0 0 28px}
+    .hero-buttons{display:flex;gap:12px;flex-wrap:wrap}.hero .btn-light{background:#fff;color:var(--dark)}
+    .hero-note{font-size:12px;color:#c6ded0;margin-top:20px}
+    .wrap{max-width:1120px;margin:auto;padding:55px 24px}.section-head{text-align:center;margin-bottom:30px}
+    .section-head h2{font-size:32px;margin:0 0 9px}.section-head p{color:var(--muted);margin:0}
+    .cards{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:18px}
+    .card{background:#fff;border:1px solid var(--line);border-radius:20px;padding:25px;box-shadow:0 8px 28px #163c2510}
+    .card-icon{width:48px;height:48px;background:var(--mint);border-radius:15px;display:grid;place-items:center;font-size:23px}
+    .card h3{font-size:21px;margin:17px 0 8px}.card p{color:var(--muted);line-height:1.6;margin:0 0 18px}
+    .features{display:grid;grid-template-columns:repeat(3,1fr);gap:14px;margin-top:24px}
+    .feature{background:#fff;border:1px solid var(--line);border-radius:16px;padding:19px}.feature b{display:block;margin:8px 0 5px}.feature span{font-size:13px;color:var(--muted);line-height:1.5}
+    footer{background:#102f24;color:#d6e6dc;padding:28px 24px;text-align:center;font-size:13px}
+    .modal-bg{position:fixed;inset:0;background:#0b2119a8;display:none;align-items:center;justify-content:center;padding:18px;z-index:20;overflow:auto}
+    .modal-bg.show{display:flex}.modal{background:#fff;border-radius:22px;width:min(100%,470px);padding:26px;box-shadow:0 20px 80px #0004;position:relative;margin:auto}
+    .close{position:absolute;right:17px;top:14px;border:0;background:#f1f5f2;width:34px;height:34px;border-radius:50%;font-size:20px}
+    .modal h2{margin:5px 0 7px;font-size:26px}.sub{color:var(--muted);font-size:14px;margin:0 0 20px;line-height:1.5}
+    .tabs{display:flex;background:#f0f5f1;padding:4px;border-radius:12px;margin:18px 0}.tab{flex:1;border:0;background:transparent;padding:10px;border-radius:9px;font-weight:700;color:var(--muted)}.tab.active{background:#fff;color:var(--dark);box-shadow:0 2px 7px #102f2412}
+    label{font-size:13px;font-weight:700;display:block;margin:13px 0 6px}
+    input,select{width:100%;border:1px solid #dce6de;border-radius:11px;padding:13px 12px;background:#fff;color:var(--ink);outline:none}
+    input:focus,select:focus{border-color:var(--green2);box-shadow:0 0 0 3px #21865b18}
+    .full{width:100%;margin-top:18px}.form-note{font-size:12px;color:var(--muted);line-height:1.5;margin-top:12px}
+    .link{border:0;background:none;color:var(--green);font-weight:700;padding:10px 0}
+    .status{font-size:13px;padding:11px 12px;border-radius:10px;margin-top:13px;display:none;line-height:1.45}.status.error{display:block;background:#fff0ef;color:var(--red)}.status.ok{display:block;background:#eaf7ef;color:#176b49}
+    .dashboard{display:none;min-height:calc(100vh - 72px);padding:35px 20px}.dash-inner{max-width:900px;margin:auto}
+    .dash-head{display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap}
+    .welcome{background:linear-gradient(120deg,var(--dark),var(--green));color:#fff;padding:27px;border-radius:20px;margin:22px 0}
+    .welcome p{color:#d6e9dd;margin-bottom:0}.dash-grid{display:grid;grid-template-columns:repeat(2,1fr);gap:14px}
+    .dash-tile{background:#fff;border:1px solid var(--line);padding:22px;border-radius:16px}.dash-tile span{font-size:13px;color:var(--muted)}
+    .notice{background:#fff8e8;border:1px solid #f3dfaa;color:#775817;padding:15px;border-radius:13px;line-height:1.5;font-size:13px;margin-top:18px}
+    .hidden{display:none!important}
+    @media(max-width:650px){.top{height:64px;padding:0 16px}.top-actions .btn-light{display:none}.hero{padding:55px 22px 58px}.hero p{font-size:15px}.wrap{padding:42px 18px}.cards,.features{grid-template-columns:1fr}.section-head h2{font-size:27px}.modal{padding:22px}.dash-grid{grid-template-columns:1fr}}
+  </style>
+</head>
+<body>
+<header class="top">
+  <div class="brand"><div class="logo">↗</div><div>HORIZONTE<small>ENTREGAS</small></div></div>
+  <div class="top-actions"><button class="btn btn-light" id="headerRegister">Criar conta</button><button class="btn btn-primary" id="headerLogin">Entrar</button></div>
+</header>
+
+<main id="publicPage">
+  <section class="hero">
+    <div class="hero-inner">
+      <div class="eyebrow"><span class="dot"></span> HORIZONTE · CEARÁ</div>
+      <h1>Sua entrega.<br>Nosso compromisso.</h1>
+      <p>Conectamos lojas a entregadores disponíveis na cidade. Mais praticidade para o comércio e novas oportunidades para quem entrega.</p>
+      <div class="hero-buttons">
+        <button class="btn btn-light" id="heroStore">Sou uma loja</button>
+        <button class="btn btn-outline" style="background:#ffffff12;border-color:#ffffff65;color:white" id="heroCourier">Quero entregar</button>
+      </div>
+      <div class="hero-note">Uma rede local de entregas, feita para aproximar pessoas e negócios.</div>
+    </div>
+  </section>
+  <section class="wrap">
+    <div class="section-head"><h2>Faça parte da nossa rede</h2><p>Escolha como deseja utilizar a Horizonte Entregas.</p></div>
+    <div class="cards">
+      <article class="card"><div class="card-icon">🏪</div><h3>Para lojas</h3><p>Encontre entregadores para atender seus pedidos sem precisar manter uma equipe fixa.</p><button class="btn btn-primary" id="cardStore">Cadastrar minha loja</button></article>
+      <article class="card"><div class="card-icon">🛵</div><h3>Para entregadores</h3><p>Cadastre-se, informe seus dados e prepare-se para receber oportunidades de entrega.</p><button class="btn btn-primary" id="cardCourier">Quero me cadastrar</button></article>
+    </div>
+    <div class="features">
+      <div class="feature">📍<b>Atuação local</b><span>Começando por Horizonte, Ceará.</span></div>
+      <div class="feature">🤝<b>Conexão direta</b><span>Lojas e entregadores em uma mesma plataforma.</span></div>
+      <div class="feature">📱<b>Feito para celular</b><span>Acesse pelo navegador do seu smartphone.</span></div>
+    </div>
+  </section>
+</main>
+
+<section id="dashboard" class="dashboard">
+  <div class="dash-inner">
+    <div class="dash-head"><div class="brand"><div class="logo">↗</div><div>HORIZONTE<small>PAINEL DO USUÁRIO</small></div></div><button class="btn btn-outline" id="logout">Sair da conta</button></div>
+    <div class="welcome"><div class="eyebrow"><span class="dot"></span> CONTA CONECTADA</div><h2 id="dashTitle">Bem-vindo!</h2><p id="dashDescription">Seu cadastro está salvo na Horizonte Entregas.</p></div>
+    <div class="dash-grid">
+      <div class="dash-tile"><span>Nome / estabelecimento</span><h3 id="dashName">—</h3></div>
+      <div class="dash-tile"><span>Tipo de cadastro</span><h3 id="dashRole">—</h3></div>
+      <div class="dash-tile"><span>E-mail</span><h3 id="dashEmail" style="font-size:15px;overflow-wrap:anywhere">—</h3></div>
+      <div class="dash-tile"><span>Cidade</span><h3>Horizonte – CE</h3></div>
+    </div>
+    <div class="notice"><b>Primeira versão em construção:</b> o cadastro e o acesso já estão preparados. A solicitação, distribuição e aceitação de corridas serão adicionadas na próxima etapa, depois da configuração das regras de segurança.</div>
+  </div>
+</section>
+
+<div class="modal-bg" id="authModal" role="dialog" aria-modal="true" aria-labelledby="modalTitle">
+  <div class="modal">
+    <button class="close" id="closeModal" aria-label="Fechar">×</button>
+    <div class="brand"><div class="logo">↗</div><div>HORIZONTE<small>ENTREGAS</small></div></div>
+    <h2 id="modalTitle">Crie sua conta</h2><p class="sub" id="modalSubtitle">Entre para fazer parte da nossa rede.</p>
+    <div class="tabs"><button class="tab active" id="tabRegister">Criar conta</button><button class="tab" id="tabLogin">Entrar</button></div>
+    <form id="authForm">
+      <div id="roleBlock">
+        <label for="role">Quero me cadastrar como</label>
+        <select id="role" required><option value="store">Loja / estabelecimento</option><option value="courier">Entregador</option></select>
+      </div>
+      <div id="nameBlock"><label for="fullName">Nome completo ou nome da loja</label><input id="fullName" autocomplete="name" maxlength="100" required placeholder="Digite seu nome"></div>
+      <div id="phoneBlock"><label for="phone">Telefone / WhatsApp</label><input id="phone" type="tel" autocomplete="tel" maxlength="20" placeholder="(85) 99999-9999"></div>
+      <label for="email">E-mail</label><input id="email" type="email" autocomplete="email" required placeholder="voce@email.com">
+      <label for="password">Senha</label><input id="password" type="password" autocomplete="new-password" minlength="6" required placeholder="Mínimo de 6 caracteres">
+      <button class="btn btn-primary full" id="submitAuth" type="submit">Criar minha conta</button>
+      <button class="link hidden" type="button" id="forgotPassword">Esqueci minha senha</button>
+      <div class="status" id="formStatus" role="status"></div>
+      <p class="form-note">Ao continuar, você declara que os dados informados são verdadeiros. Consulte os termos e a política de privacidade antes do lançamento público.</p>
+    </form>
+  </div>
+</div>
+
+<footer>© 2026 Horizonte Entregas · Horizonte – Ceará<br>Conectando lojas e entregadores.</footer>
+
+<script type="module">
+  import { initializeApp } from "https://www.gstatic.com/firebasejs/13.2.0/firebase-app.js";
+  import { getAuth, createUserWithEmailAndPassword, signInWithEmailAndPassword, sendPasswordResetEmail, signOut, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/13.2.0/firebase-auth.js";
+  import { getFirestore, doc, setDoc, getDoc, serverTimestamp } from "https://www.gstatic.com/firebasejs/13.2.0/firebase-firestore.js";
+
+  const firebaseConfig = {
+    apiKey: "AIzaSyASEHCpb4wraE9UdagQ5cd6x9XdwLVfDWM",
+    authDomain: "horizonte-entregas.firebaseapp.com",
+    projectId: "horizonte-entregas",
+    storageBucket: "horizonte-entregas.firebasestorage.app",
+    messagingSenderId: "770166170599",
+    appId: "1:770166170599:web:315b30c242d0c63b0fd342"
+  };
+
+  const app = initializeApp(firebaseConfig);
+  const auth = getAuth(app);
+  const db = getFirestore(app);
+
+  const $ = (id) => document.getElementById(id);
+  let mode = "register";
+  let presetRole = null;
+
+  function showStatus(message, type="error") {
+    const el = $("formStatus");
+    el.textContent = message;
+    el.className = "status " + type;
+  }
+  function clearStatus(){ $("formStatus").className = "status"; $("formStatus").textContent = ""; }
+  function openModal(nextMode="register", role=null) {
+    mode = nextMode; presetRole = role;
+    $("authModal").classList.add("show");
+    $("role").value = role || "store";
+    updateMode();
+    clearStatus();
+  }
+  function closeModal(){ $("authModal").classList.remove("show"); $("authForm").reset(); clearStatus(); }
+  function updateMode(){
+    const registering = mode === "register";
+    $("tabRegister").classList.toggle("active", registering);
+    $("tabLogin").classList.toggle("active", !registering);
+    $("modalTitle").textContent = registering ? "Crie sua conta" : "Bem-vindo de volta";
+    $("modalSubtitle").textContent = registering ? "Cadastre-se para fazer parte da nossa rede." : "Entre com seu e-mail e sua senha.";
+    $("roleBlock").classList.toggle("hidden", !registering);
+    $("nameBlock").classList.toggle("hidden", !registering);
+    $("phoneBlock").classList.toggle("hidden", !registering);
+    $("fullName").required = registering;
+    $("submitAuth").textContent = registering ? "Criar minha conta" : "Entrar";
+    $("forgotPassword").classList.toggle("hidden", registering);
+    $("password").autocomplete = registering ? "new-password" : "current-password";
+    clearStatus();
+  }
+  ["headerRegister","cardStore","cardCourier","heroStore","heroCourier"].forEach(id => $(id).addEventListener("click", () => {
+    const role = ["cardCourier","heroCourier"].includes(id) ? "courier" : (id === "headerRegister" ? null : "store");
+    openModal("register", role);
+  }));
+  $("headerLogin").addEventListener("click", () => openModal("login"));
+  $("closeModal").addEventListener("click", closeModal);
+  $("authModal").addEventListener("click", e => { if(e.target === $("authModal")) closeModal(); });
+  $("tabRegister").addEventListener("click", () => {mode="register";updateMode();});
+  $("tabLogin").addEventListener("click", () => {mode="login";updateMode();});
+
+  function friendlyError(error) {
+    const code = error?.code || "";
+    const map = {
+      "auth/email-already-in-use":"Este e-mail já possui cadastro. Tente entrar.",
+      "auth/invalid-email":"Digite um e-mail válido.",
+      "auth/weak-password":"A senha precisa ter pelo menos 6 caracteres.",
+      "auth/invalid-credential":"E-mail ou senha incorretos.",
+      "auth/user-not-found":"Não encontramos uma conta com esse e-mail.",
+      "auth/wrong-password":"Senha incorreta.",
+      "auth/too-many-requests":"Muitas tentativas. Aguarde um pouco e tente novamente.",
+      "permission-denied":"O Firebase bloqueou a gravação. Confira as regras do Firestore no guia de instalação.",
+      "unavailable":"Serviço temporariamente indisponível. Verifique sua conexão."
+    };
+    return map[code] || (error?.message?.includes("Missing or insufficient permissions") ? "As regras do Firestore ainda precisam ser configuradas. Siga o guia incluído no pacote." : "Não foi possível concluir. Confira sua conexão e tente novamente.");
+  }
+
+  $("authForm").addEventListener("submit", async (e) => {
+    e.preventDefault();
+    clearStatus();
+    const email = $("email").value.trim();
+    const password = $("password").value;
+    $("submitAuth").disabled = true;
+    $("submitAuth").textContent = "Aguarde...";
+    try {
+      if(mode === "register") {
+        const fullName = $("fullName").value.trim();
+        const phone = $("phone").value.trim();
+        const role = $("role").value;
+        if(!fullName) throw new Error("Informe seu nome ou o nome do estabelecimento.");
+        const credential = await createUserWithEmailAndPassword(auth, email, password);
+        await setDoc(doc(db, "users", credential.user.uid), {
+          uid: credential.user.uid,
+          name: fullName,
+          phone,
+          email,
+          role,
+          city: "Horizonte",
+          state: "CE",
+          status: "pending",
+          available: false,
+          createdAt: serverTimestamp()
+        });
+        showStatus("Cadastro criado! Seu perfil foi salvo. Estamos preparando seu painel.", "ok");
+      } else {
+        await signInWithEmailAndPassword(auth, email, password);
+        closeModal();
+      }
+    } catch(error) {
+      showStatus(friendlyError(error));
+    } finally {
+      $("submitAuth").disabled = false;
+      $("submitAuth").textContent = mode === "register" ? "Criar minha conta" : "Entrar";
+    }
+  });
+
+  $("forgotPassword").addEventListener("click", async () => {
+    const email = $("email").value.trim();
+    if(!email){showStatus("Digite seu e-mail acima para receber o link de recuperação.");return;}
+    try { await sendPasswordResetEmail(auth,email); showStatus("Enviamos um link de recuperação para seu e-mail.","ok"); }
+    catch(error){showStatus(friendlyError(error));}
+  });
+
+  async function showDashboard(user) {
+    $("publicPage").classList.add("hidden");
+    $("dashboard").style.display = "block";
+    $("authModal").classList.remove("show");
+    try {
+      const snap = await getDoc(doc(db,"users",user.uid));
+      if(!snap.exists()) {
+        $("dashTitle").textContent = "Conta autenticada";
+        $("dashDescription").textContent = "Seu perfil ainda não foi localizado. Entre em contato com o administrador.";
+        $("dashName").textContent = "Perfil não encontrado";
+        $("dashRole").textContent = "—";
+        $("dashEmail").textContent = user.email || "—";
+        return;
+      }
+      const data = snap.data();
+      const roleName = data.role === "store" ? "Loja / estabelecimento" : "Entregador";
+      $("dashTitle").textContent = `Olá, ${data.name}!`;
+      $("dashDescription").textContent = data.status === "pending" ? "Seu cadastro foi recebido e aguarda análise administrativa." : "Você está na sua área da Horizonte Entregas.";
+      $("dashName").textContent = data.name || "—";
+      $("dashRole").textContent = roleName;
+      $("dashEmail").textContent = data.email || user.email || "—";
+    } catch(error) {
+      $("dashDescription").textContent = "Não foi possível carregar seu perfil. Verifique as regras do Firestore.";
+    }
+  }
+
+  $("logout").addEventListener("click", async () => {
+    await signOut(auth);
+    $("dashboard").style.display = "none";
+    $("publicPage").classList.remove("hidden");
+  });
+
+  onAuthStateChanged(auth, user => {
+    if(user) showDashboard(user);
+    else {
+      $("dashboard").style.display = "none";
+      $("publicPage").classList.remove("hidden");
+    }
+  });
+</script>
+</body>
+</html>
