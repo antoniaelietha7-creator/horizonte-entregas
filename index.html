@@ -342,8 +342,19 @@ body{background:#f3f4f9;color:#151827;font-family:Arial,"DM Sans",sans-serif}
     </section>
 
     <section id="adminPanel" class="hidden" style="margin-top:28px">
-      <div class="dash-head"><div><h2 style="margin-bottom:4px">Painel administrativo</h2><p style="color:var(--muted);margin-top:0">Analise os cadastros de lojas e entregadores.</p></div><button class="btn btn-outline" id="refreshUsers">Atualizar lista</button></div>
-      <div id="adminStatus" class="notice">Carregando cadastros...</div>
+      <div class="dash-head"><div><h2 style="margin-bottom:4px">Painel administrativo</h2><p style="color:var(--muted);margin-top:0">Acompanhe lojas, pedidos, entregadores e repasses.</p></div><button class="btn btn-outline" id="refreshUsers">Atualizar painel</button></div>
+      <div id="adminStatus" class="notice">Carregando dados administrativos...</div>
+      <div class="dash-grid" style="margin-top:14px">
+        <div class="dash-tile"><span>Pedidos registrados</span><h2 id="adminOrderCount">0</h2></div>
+        <div class="dash-tile"><span>Entregas concluídas</span><h2 id="adminCompletedCount">0</h2></div>
+        <div class="dash-tile"><span>Total a pagar aos entregadores</span><h2 id="adminPayableTotal">R$ 0,00</h2></div>
+        <div class="dash-tile"><span>Total já marcado como pago</span><h2 id="adminPaidTotal">R$ 0,00</h2></div>
+      </div>
+      <h3 style="margin-top:26px">📦 Pedidos de todas as lojas</h3>
+      <div id="adminDeliveryList" class="delivery-list"></div>
+      <h3 style="margin-top:28px">🛵 Entregas e valores por entregador</h3>
+      <div id="adminCourierPayouts" class="delivery-list"></div>
+      <h3 style="margin-top:28px">👥 Lojas e entregadores cadastrados</h3>
       <div id="userList" style="display:grid;gap:12px;margin-top:14px"></div>
     </section>
     <div id="regularNotice" class="notice"><b>Primeira versão em construção:</b> o cadastro e o acesso já estão preparados. A solicitação, distribuição e aceitação de corridas serão adicionadas na próxima etapa, depois da configuração das regras de segurança.</div>
@@ -565,7 +576,7 @@ body{background:#f3f4f9;color:#151827;font-family:Arial,"DM Sans",sans-serif}
     try {
       if (user.uid === ADMIN_UID) {
         $("dashTitle").textContent = "Olá, administradora!";
-        $("dashDescription").textContent = "Você tem acesso ao gerenciamento dos cadastros.";
+        $("dashDescription").textContent = "Você tem acesso aos pedidos das lojas, entregas e repasses dos entregadores.";
         $("dashName").textContent = "Administração";
         $("dashRole").textContent = "Administradora";
         $("dashEmail").textContent = user.email || "—";
@@ -575,7 +586,7 @@ body{background:#f3f4f9;color:#151827;font-family:Arial,"DM Sans",sans-serif}
         $("courierPanel").classList.add("hidden");
         $("adminPanel").classList.remove("hidden");
         $("regularNotice").classList.add("hidden");
-        await loadUsers();
+        await loadAdminDashboard();
         return;
       }
       $("adminPanel").classList.add("hidden");
@@ -864,8 +875,8 @@ Loja: ${d.storeName||"—"}`;
       await updateDoc(doc(db,"users",currentCourier.uid),{pixKeyType:type,pixKey:key,pixKeyUpdatedAt:serverTimestamp()});
       status.textContent="Chave Pix salva no seu cadastro.";status.className="status ok";
     }catch(error){
-      console.error(error);
-      status.textContent="Não foi possível salvar. Verifique as regras de atualização do seu perfil no Firestore.";status.className="status error";
+      console.error("Falha ao salvar chave Pix:",error);
+      status.textContent=error.code==="permission-denied"?"O Firestore bloqueou a alteração. Publique as novas regras de perfil para permitir salvar somente sua chave Pix.":"Não foi possível salvar a chave Pix. Confira sua conexão e tente novamente.";status.className="status error";
     }finally{button.disabled=false;}
   });
   $("refreshCourierEarnings").addEventListener("click",loadCourierEarnings);
@@ -952,6 +963,70 @@ Loja: ${d.storeName||"—"}`;
     finally{button.disabled=false;button.textContent="Já fiz o pagamento — Solicitar entregador";}
   });
 
+  async function loadAdminDashboard(){
+    if(!auth.currentUser || auth.currentUser.uid!==ADMIN_UID)return;
+    $("adminStatus").textContent="Atualizando pedidos, entregas e repasses...";
+    const results=await Promise.allSettled([loadUsers(),loadAdminDeliveries()]);
+    const failed=results.some(r=>r.status==="rejected");
+    if(failed)$("adminStatus").textContent="Parte dos dados não pôde ser carregada. Confira se as novas regras do Firestore já foram publicadas.";
+  }
+
+  async function loadAdminDeliveries(){
+    const list=$("adminDeliveryList"),payouts=$("adminCourierPayouts");
+    list.innerHTML="<p>Carregando pedidos...</p>";payouts.innerHTML="<p>Calculando repasses...</p>";
+    const [deliverySnap,userSnap]=await Promise.all([getDocs(collection(db,"deliveries")),getDocs(collection(db,"users"))]);
+    const users=new Map(userSnap.docs.map(x=>[x.id,{id:x.id,...x.data()}]));
+    const deliveries=deliverySnap.docs.map(x=>({id:x.id,...x.data()})).sort((a,b)=>(b.createdAt?.toMillis?.()||0)-(a.createdAt?.toMillis?.()||0));
+    const completed=deliveries.filter(d=>d.status==="completed");
+    const pendingPay=completed.filter(d=>d.courierPayoutStatus!=="paid");
+    const paid=completed.filter(d=>d.courierPayoutStatus==="paid");
+    const sum=items=>items.reduce((n,d)=>n+Number(d.deliveryFee||0),0);
+    $("adminOrderCount").textContent=String(deliveries.length);
+    $("adminCompletedCount").textContent=String(completed.length);
+    $("adminPayableTotal").textContent=formatBRL(sum(pendingPay));
+    $("adminPaidTotal").textContent=formatBRL(sum(paid));
+    list.innerHTML="";
+    if(!deliveries.length)list.innerHTML="<p>Nenhum pedido registrado até agora.</p>";
+    deliveries.forEach(d=>{
+      const store=users.get(d.storeUid)||{};const courier=users.get(d.courierUid)||{};
+      const card=document.createElement("article");card.className="delivery-item";
+      const h=document.createElement("h3");h.textContent=`${d.storeName||store.name||"Loja"} — ${d.recipientName||"Pedido"}`;
+      const info=document.createElement("p");info.textContent=`Bairro: ${d.neighborhood||"—"} · Destino: ${d.deliveryAddress||"—"}`;
+      const who=document.createElement("p");who.textContent=`Entregador: ${d.courierName||courier.name||"Ainda não aceito"} · Telefone: ${courier.phone||d.courierPhone||"—"}`;
+      const state=document.createElement("p");state.textContent=`Situação: ${d.status==="open"?"Aguardando entregador":d.status==="accepted"?"Em andamento":d.status==="completed"?"Concluída":d.status} · Taxa: ${formatBRL(d.deliveryFee||0)}`;
+      const payment=document.createElement("p");payment.textContent=`Pagamento da loja: ${d.paymentStatus==="reported_by_store"?"Informado pela loja":d.paymentStatus||"Não informado"} · Repasse: ${d.status!=="completed"?"Ainda não devido":d.courierPayoutStatus==="paid"?"Marcado como pago":"Pendente"}`;
+      card.append(h,info,who,state,payment);
+      if(d.status==="completed"&&d.courierPayoutStatus!=="paid"){
+        const pix=document.createElement("p");pix.textContent=`Chave Pix: ${courier.pixKey||"Entregador ainda não cadastrou a chave"}`;card.append(pix);
+        const pay=document.createElement("button");pay.className="btn btn-primary";pay.textContent="Marcar este repasse como pago";
+        pay.addEventListener("click",()=>markCourierPayoutPaid(d.id,pay));card.append(pay);
+      }
+      list.append(card);
+    });
+    const groups=new Map();
+    completed.forEach(d=>{const key=d.courierUid||"sem-entregador";if(!groups.has(key))groups.set(key,[]);groups.get(key).push(d);});
+    payouts.innerHTML="";
+    if(!groups.size)payouts.innerHTML="<p>Ainda não existem entregas concluídas para calcular repasses.</p>";
+    for(const [uid,items] of groups){
+      const u=users.get(uid)||{};const due=items.filter(d=>d.courierPayoutStatus!=="paid");const done=items.filter(d=>d.courierPayoutStatus==="paid");
+      const card=document.createElement("article");card.className="delivery-item";
+      const h=document.createElement("h3");h.textContent=u.name||items[0].courierName||"Entregador não identificado";
+      const detail=document.createElement("p");detail.textContent=`Telefone: ${u.phone||"—"} · Chave Pix (${u.pixKeyType||"não informada"}): ${u.pixKey||"Não cadastrada"}`;
+      const total=document.createElement("p");total.textContent=`Entregas concluídas: ${items.length} · Total gerado: ${formatBRL(sum(items))}`;
+      const pending=document.createElement("strong");pending.textContent=`A pagar: ${formatBRL(sum(due))} · Já pago: ${formatBRL(sum(done))}`;
+      card.append(h,detail,total,pending);payouts.append(card);
+    }
+    $("adminStatus").textContent=`Painel atualizado: ${deliveries.length} pedido(s), ${completed.length} entrega(s) concluída(s).`;
+  }
+
+  async function markCourierPayoutPaid(deliveryId,button){
+    if(!auth.currentUser||auth.currentUser.uid!==ADMIN_UID){alert("Acesso não autorizado.");return;}
+    if(!confirm("Confirma que o valor desta entrega já foi transferido ao entregador? Marque somente depois de realizar o Pix no banco."))return;
+    button.disabled=true;button.textContent="Salvando...";
+    try{await updateDoc(doc(db,"deliveries",deliveryId),{courierPayoutStatus:"paid",courierPaidAt:serverTimestamp()});await loadAdminDeliveries();}
+    catch(error){console.error(error);alert("Não foi possível registrar o repasse. Confira as regras do Firestore.");button.disabled=false;button.textContent="Marcar este repasse como pago";}
+  }
+
   async function loadUsers() {
     const status = $("adminStatus");
     const list = $("userList");
@@ -1008,7 +1083,7 @@ Loja: ${d.storeName||"—"}`;
     }
   }
 
-  $("refreshUsers").addEventListener("click", loadUsers);
+  $("refreshUsers").addEventListener("click", loadAdminDashboard);
 
   $("sideLogout")?.addEventListener("click", () => $("logout").click());
   document.querySelectorAll(".side-link[data-target]").forEach(button => button.addEventListener("click", () => {
