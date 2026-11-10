@@ -288,7 +288,13 @@ body{background:#f3f4f9;color:#151827;font-family:Arial,"DM Sans",sans-serif}
         </div>
         <div class="span-2"><button class="btn btn-primary full" id="submitDelivery" type="submit" disabled>Já fiz o pagamento — Solicitar entregador</button><div id="deliveryStatus" class="status" role="status"></div></div>
       </form>
-      <div style="margin-top:26px"><h3>Minhas solicitações</h3><p class="muted">Aqui aparecerão os pedidos de entrega registrados por esta loja.</p><button class="btn btn-outline" id="refreshDeliveries" type="button">Atualizar solicitações</button><div id="deliveryList" class="delivery-list"></div></div>
+    </section>
+
+    <section id="storeDeliveriesPanel" class="store-panel hidden" style="margin-top:28px">
+      <h2>📦 Minhas Entregas</h2>
+      <p class="muted">Acompanhe aqui as solicitações de entrega registradas pela sua loja.</p>
+      <button class="btn btn-outline" id="refreshDeliveries" type="button">Atualizar entregas</button>
+      <div id="deliveryList" class="delivery-list"></div>
     </section>
 
     <section id="storeProfilePanel" class="store-panel hidden" style="margin-top:28px">
@@ -307,6 +313,27 @@ body{background:#f3f4f9;color:#151827;font-family:Arial,"DM Sans",sans-serif}
       <div class="courier-alerts">
         <div><b>🔔 Alertas de novas entregas</b><small id="alertStatus">Som e notificações desativados.</small></div>
         <button class="btn btn-primary" id="enableCourierAlerts" type="button">Ativar som e notificações</button>
+      </div>
+      <div class="store-panel" style="margin:14px 0">
+        <h3>💠 Minha chave Pix</h3>
+        <p class="muted">Cadastre a chave Pix da conta em que deseja receber os repasses das entregas.</p>
+        <label for="courierPixType">Tipo da chave</label>
+        <select id="courierPixType"><option value="cpf">CPF</option><option value="cnpj">CNPJ</option><option value="email">E-mail</option><option value="phone">Telefone</option><option value="random">Chave aleatória</option></select>
+        <label for="courierPixKey">Sua chave Pix</label>
+        <input id="courierPixKey" maxlength="150" placeholder="Digite sua chave Pix">
+        <button class="btn btn-primary" id="saveCourierPix" type="button" style="margin-top:12px">Salvar chave Pix</button>
+        <div id="courierPixStatus" class="status" role="status"></div>
+      </div>
+      <div class="store-panel" style="margin:14px 0">
+        <h3>💰 Meus recebimentos</h3>
+        <p class="muted">O cálculo considera 100% da taxa da entrega, após a conclusão da corrida.</p>
+        <div class="dash-grid" style="display:grid;grid-template-columns:repeat(2,minmax(0,1fr));margin:12px 0">
+          <div class="dash-tile"><span>Entregas concluídas</span><h2 id="courierCompletedCount">0</h2></div>
+          <div class="dash-tile"><span>Total a receber</span><h2 id="courierEarningsTotal">R$ 0,00</h2></div>
+        </div>
+        <button class="btn btn-outline" id="refreshCourierEarnings" type="button">Atualizar recebimentos</button>
+        <div id="courierEarningsList" class="delivery-list"></div>
+        <p class="form-note">Este painel calcula os valores registrados. O repasse via Pix ainda é realizado manualmente pela empresa; o site não faz transferência bancária automática.</p>
       </div>
       <h3>Entregas disponíveis</h3><button class="btn btn-outline" id="refreshOpen" type="button">Atualizar entregas</button><div id="openDeliveries"></div>
       <h3 style="margin-top:28px">Minha entrega aceita</h3><div id="myDelivery"></div>
@@ -543,6 +570,8 @@ body{background:#f3f4f9;color:#151827;font-family:Arial,"DM Sans",sans-serif}
         $("dashRole").textContent = "Administradora";
         $("dashEmail").textContent = user.email || "—";
         $("storePanel").classList.add("hidden");
+        $("storeDeliveriesPanel").classList.add("hidden");
+        $("storeProfilePanel").classList.add("hidden");
         $("courierPanel").classList.add("hidden");
         $("adminPanel").classList.remove("hidden");
         $("regularNotice").classList.add("hidden");
@@ -551,6 +580,8 @@ body{background:#f3f4f9;color:#151827;font-family:Arial,"DM Sans",sans-serif}
       }
       $("adminPanel").classList.add("hidden");
       $("storePanel").classList.add("hidden");
+      $("storeDeliveriesPanel").classList.add("hidden");
+      $("storeProfilePanel").classList.add("hidden");
       $("courierPanel").classList.add("hidden");
       $("regularNotice").classList.remove("hidden");
       const snap = await getDoc(doc(db,"users",user.uid));
@@ -575,9 +606,12 @@ body{background:#f3f4f9;color:#151827;font-family:Arial,"DM Sans",sans-serif}
         await loadStoreDeliveries();
       } else if(data.role === "courier" && data.status === "approved") {
         currentCourier = {uid:user.uid, name:data.name || "Entregador", phone:data.phone || ""};
+        $("courierPixType").value = data.pixKeyType || "cpf";
+        $("courierPixKey").value = data.pixKey || "";
         $("courierPanel").classList.remove("hidden");
         $("regularNotice").classList.add("hidden");
         loadCourierDeliveries();
+        loadCourierEarnings();
       } else {
         $("storePanel").classList.add("hidden");
         $("courierPanel").classList.add("hidden");
@@ -789,6 +823,53 @@ Loja: ${d.storeName||"—"}`;
     }catch(error){open.innerHTML="<p>Não foi possível carregar. Verifique as regras do Firestore e se o cadastro está aprovado.</p>";mine.innerHTML="";}
   }
 
+  function formatBRL(value){return Number(value||0).toLocaleString("pt-BR",{style:"currency",currency:"BRL"});}
+  async function loadCourierEarnings(){
+    if(!currentCourier)return;
+    const list=$("courierEarningsList");
+    list.innerHTML="<p>Calculando seus recebimentos...</p>";
+    try{
+      const q=query(collection(db,"deliveries"),where("courierUid","==",currentCourier.uid));
+      const snapshot=await getDocs(q);
+      const completed=snapshot.docs.map(item=>({id:item.id,...item.data()})).filter(item=>item.status==="completed");
+      const total=completed.reduce((sum,item)=>sum+Number(item.deliveryFee||0),0);
+      $("courierCompletedCount").textContent=String(completed.length);
+      $("courierEarningsTotal").textContent=formatBRL(total);
+      list.innerHTML="";
+      if(!completed.length){list.innerHTML="<p>Você ainda não tem entregas concluídas.</p>";return;}
+      completed.sort((a,b)=>{
+        const ta=a.completedAt?.toMillis?a.completedAt.toMillis():0;
+        const tb=b.completedAt?.toMillis?b.completedAt.toMillis():0;
+        return tb-ta;
+      }).forEach(item=>{
+        const card=document.createElement("article");card.className="delivery-item";
+        const title=document.createElement("h3");title.textContent="Entrega concluída — "+(item.neighborhood||"Bairro não informado");
+        const details=document.createElement("p");details.textContent="Loja: "+(item.storeName||"—");
+        const amount=document.createElement("strong");amount.textContent=formatBRL(item.deliveryFee||0);
+        card.append(title,details,amount);list.append(card);
+      });
+    }catch(error){
+      console.error("Erro ao calcular recebimentos do entregador:",error);
+      list.innerHTML="<p>Não foi possível calcular agora. Verifique as permissões de leitura das entregas no Firestore.</p>";
+    }
+  }
+
+  $("saveCourierPix").addEventListener("click",async()=>{
+    const key=$("courierPixKey").value.trim();
+    const type=$("courierPixType").value;
+    const status=$("courierPixStatus");
+    if(!currentCourier||key.length<3){status.textContent="Informe uma chave Pix válida.";status.className="status error";return;}
+    const button=$("saveCourierPix");button.disabled=true;
+    try{
+      await updateDoc(doc(db,"users",currentCourier.uid),{pixKeyType:type,pixKey:key,pixKeyUpdatedAt:serverTimestamp()});
+      status.textContent="Chave Pix salva no seu cadastro.";status.className="status ok";
+    }catch(error){
+      console.error(error);
+      status.textContent="Não foi possível salvar. Verifique as regras de atualização do seu perfil no Firestore.";status.className="status error";
+    }finally{button.disabled=false;}
+  });
+  $("refreshCourierEarnings").addEventListener("click",loadCourierEarnings);
+
   async function acceptDelivery(id,button){
     button.disabled=true;button.textContent="Aceitando...";
     try{
@@ -814,7 +895,7 @@ Loja: ${d.storeName||"—"}`;
   async function completeDelivery(id,button){
     if(!confirm("Confirma que esta entrega foi concluída?"))return;
     button.disabled=true;
-    try{await updateDoc(doc(db,"deliveries",id),{status:"completed",completedAt:serverTimestamp()});stopGps();await loadCourierDeliveries();}
+    try{await updateDoc(doc(db,"deliveries",id),{status:"completed",completedAt:serverTimestamp()});stopGps();await loadCourierDeliveries();await loadCourierEarnings();}
     catch(error){alert("Não foi possível concluir. Tente novamente.");button.disabled=false;}
   }
   $("refreshOpen").addEventListener("click",loadCourierDeliveries);
@@ -931,10 +1012,14 @@ Loja: ${d.storeName||"—"}`;
 
   $("sideLogout")?.addEventListener("click", () => $("logout").click());
   document.querySelectorAll(".side-link[data-target]").forEach(button => button.addEventListener("click", () => {
+    const targetId = button.dataset.target;
+    const storeSections = ["storePanel","storeDeliveriesPanel","storeProfilePanel"];
+    if(storeSections.includes(targetId)){
+      storeSections.forEach(id => $(id).classList.toggle("hidden", id !== targetId));
+    }
     document.querySelectorAll(".side-link").forEach(item => item.classList.remove("active"));
     button.classList.add("active");
-    const target = document.getElementById(button.dataset.target);
-    if(target?.id === "storeProfilePanel") target.classList.remove("hidden");
+    const target = document.getElementById(targetId);
     target?.scrollIntoView({behavior:"smooth",block:"start"});
   }));
   $("logout").addEventListener("click", async () => {
@@ -945,6 +1030,8 @@ Loja: ${d.storeName||"—"}`;
     await signOut(auth);
     $("dashboard").style.display = "none";
     $("storePanel").classList.add("hidden");
+    $("storeDeliveriesPanel").classList.add("hidden");
+    $("storeProfilePanel").classList.add("hidden");
     $("publicPage").classList.remove("hidden");
   });
 
