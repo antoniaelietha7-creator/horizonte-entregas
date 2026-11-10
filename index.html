@@ -65,6 +65,13 @@
     .delivery-list{display:grid;gap:12px;margin-top:18px}.delivery-item{border:1px solid var(--line);border-radius:14px;padding:16px;background:#fbfdfb}
     .delivery-item h3{margin:0 0 7px;font-size:17px}.delivery-item p{margin:4px 0;color:var(--muted);font-size:13px;line-height:1.5}
     .fee-preview{margin-top:14px;background:var(--mint);color:var(--dark);padding:13px;border-radius:12px;font-weight:700}
+    .pix-panel{margin-top:14px;padding:18px;border:1px solid var(--line);border-radius:16px;background:#fff;text-align:center}
+    .pix-panel h3{margin:0 0 8px}.pix-amount{font-size:30px;font-weight:900;color:var(--green);margin:10px 0}
+    #pixQr{display:flex;justify-content:center;margin:14px auto;min-height:220px;align-items:center}
+    #pixQr img,#pixQr canvas{max-width:220px;width:100%;height:auto}
+    .pix-code{width:100%;min-height:82px;margin:10px 0;padding:10px;border:1px solid var(--line);border-radius:10px;font-size:11px;word-break:break-all}
+    .pix-warning{background:#fff8e8;border:1px solid #f3dfaa;color:#775817;padding:14px;border-radius:12px;text-align:left;font-size:13px;line-height:1.5;margin-top:14px}
+
     @media(max-width:650px){.delivery-form{grid-template-columns:1fr}.delivery-form .span-2{grid-column:auto}.store-panel{padding:17px}}
     .hidden{display:none!important}
     .delivery-item{background:#fff;border:1px solid var(--line);border-radius:18px;padding:18px;margin-top:12px;box-shadow:0 7px 22px #1718200a}.delivery-item p{line-height:1.5;color:var(--muted)}.map-live{height:230px;border-radius:12px;margin-top:12px;z-index:1}.action-row{display:flex;gap:8px;flex-wrap:wrap;margin-top:12px}
@@ -202,6 +209,7 @@ body{background:#f3f4f9;color:#151827;font-family:Arial,"DM Sans",sans-serif}
 }
 
   </style>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
 </head>
 <body>
 <header class="top">
@@ -267,7 +275,19 @@ body{background:#f3f4f9;color:#151827;font-family:Arial,"DM Sans",sans-serif}
         <div class="span-2"><label for="orderDescription">O que será entregue?</label><input id="orderDescription" maxlength="220" required placeholder="Ex.: pedido de comida, documento, pacote"></div>
         <div class="span-2"><label for="deliveryNotes">Observações (opcional)</label><input id="deliveryNotes" maxlength="300" placeholder="Ponto de referência ou orientação ao entregador"></div>
         <div class="span-2 fee-preview" id="feePreview">Selecione o bairro para visualizar a taxa estimada.</div>
-        <div class="span-2"><button class="btn btn-primary full" id="submitDelivery" type="submit">Registrar solicitação</button><div id="deliveryStatus" class="status" role="status"></div></div>
+        <div class="span-2 pix-panel hidden" id="pixPaymentPanel">
+          <h3>Pagamento da taxa da plataforma</h3>
+          <p class="muted">Pague o valor exibido usando o QR Code Pix ou copie e cole o código no aplicativo do seu banco.</p>
+          <div class="pix-amount" id="pixAmount">R$ 0,00</div>
+          <div id="pixQr" aria-label="QR Code Pix"></div>
+          <label for="pixCopyCode" style="text-align:left">Pix Copia e Cola</label>
+          <textarea id="pixCopyCode" class="pix-code" readonly>00020126580014br.gov.bcb.pix0136683fa81b-47e9-4bb0-bb76-875dcd85bd1c5204000053039865802BR592558.621.059 ANTONIA DA SIL6009HORIZONTE6108628824586228052446417d57bad5405b939f2b6063042219</textarea>
+          <div class="action-row"><button class="btn btn-outline full" id="copyPixCode" type="button">Copiar código Pix</button></div>
+          <div class="pix-warning"><b>AVISO IMPORTANTE — ACOMPANHAMENTO E ESTORNO</b><br>
+          Nossa plataforma acompanha, por meio do mapa, o deslocamento do entregador desde a saída até o destino final, enquanto a localização estiver disponível. Caso a entrega não seja realizada, a ocorrência será analisada com base nos registros de acompanhamento e, sendo constatada a não realização, será realizado o estorno do valor pago à plataforma.</div>
+          <p class="muted">Após realizar o Pix, volte a esta tela e toque no botão abaixo. O site registrará apenas sua declaração de pagamento; não haverá confirmação automática junto ao banco.</p>
+        </div>
+        <div class="span-2"><button class="btn btn-primary full" id="submitDelivery" type="submit" disabled>Já fiz o pagamento — Solicitar entregador</button><div id="deliveryStatus" class="status" role="status"></div></div>
       </form>
       <div style="margin-top:26px"><h3>Minhas solicitações</h3><p class="muted">Aqui aparecerão os pedidos de entrega registrados por esta loja.</p><button class="btn btn-outline" id="refreshDeliveries" type="button">Atualizar solicitações</button><div id="deliveryList" class="delivery-list"></div></div>
     </section>
@@ -369,7 +389,26 @@ body{background:#f3f4f9;color:#151827;font-family:Arial,"DM Sans",sans-serif}
   }
   function updateFeePreview(){
     const name=$("neighborhood").value;
-    $("feePreview").textContent=name ? `Taxa estimada para ${name}: R$ ${NEIGHBORHOOD_FEES[name].toFixed(2).replace(".",",")}` : "Selecione o bairro para visualizar a taxa estimada.";
+    const panel=$("pixPaymentPanel");
+    const submit=$("submitDelivery");
+    if(!name || !NEIGHBORHOOD_FEES[name]){
+      $("feePreview").textContent="Selecione o bairro para visualizar a taxa.";
+      panel.classList.add("hidden");
+      submit.disabled=true;
+      return;
+    }
+    const amount=NEIGHBORHOOD_FEES[name];
+    $("feePreview").textContent=`Taxa da plataforma para ${name}: R$ ${amount.toFixed(2).replace(".",",")}`;
+    $("pixAmount").textContent="R$ "+amount.toFixed(2).replace(".",",");
+    panel.classList.remove("hidden");
+    submit.disabled=false;
+    const qr=$("pixQr");
+    qr.innerHTML="";
+    if(window.QRCode){
+      new QRCode(qr,{text:$("pixCopyCode").value.trim(),width:220,height:220,colorDark:"#000000",colorLight:"#ffffff",correctLevel:QRCode.CorrectLevel.M});
+    }else{
+      qr.textContent="QR Code indisponível. Use o Pix Copia e Cola.";
+    }
   }
 
   const $ = (id) => document.getElementById(id);
@@ -784,13 +823,23 @@ Loja: ${d.storeName||"—"}`;
   });
 
   $("neighborhood").addEventListener("change",updateFeePreview);
+  $("copyPixCode").addEventListener("click",async()=>{
+    try{
+      await navigator.clipboard.writeText($("pixCopyCode").value);
+      $("copyPixCode").textContent="Código Pix copiado!";
+    }catch(error){
+      $("pixCopyCode").focus();
+      $("pixCopyCode").select();
+      setDeliveryStatus("Selecione e copie o código Pix manualmente.","error");
+    }
+  });
   $("refreshDeliveries").addEventListener("click",loadStoreDeliveries);
   $("deliveryForm").addEventListener("submit",async e=>{
     e.preventDefault();
     if(!auth.currentUser || !currentStore){setDeliveryStatus("Somente uma loja aprovada pode registrar solicitações.");return;}
     const neighborhood=$("neighborhood").value;
     if(!NEIGHBORHOOD_FEES[neighborhood]){setDeliveryStatus("Selecione um bairro válido.");return;}
-    const button=$("submitDelivery");button.disabled=true;button.textContent="Registrando...";
+    const button=$("submitDelivery");button.disabled=true;button.textContent="Enviando solicitação...";
     try{
       await addDoc(collection(db,"deliveries"),{
         storeUid:currentStore.uid,storeName:currentStore.name,
@@ -798,12 +847,17 @@ Loja: ${d.storeName||"—"}`;
         recipientName:$("recipientName").value.trim(),recipientPhone:$("recipientPhone").value.trim(),
         deliveryAddress:$("deliveryAddress").value.trim(),neighborhood,
         orderDescription:$("orderDescription").value.trim(),deliveryNotes:$("deliveryNotes").value.trim(),
-        status:"open",courierUid:null,createdAt:serverTimestamp()
+        status:"open",courierUid:null,
+        deliveryFee:NEIGHBORHOOD_FEES[neighborhood],
+        paymentMethod:"pix_qr_static",
+        paymentStatus:"reported_by_store",
+        paymentReportedAt:serverTimestamp(),
+        createdAt:serverTimestamp()
       });
       $("deliveryForm").reset();updateFeePreview();setDeliveryStatus("Procurando entregadores! Sua solicitação já está disponível para aceite.","ok");
       await loadStoreDeliveries();
     }catch(error){setDeliveryStatus("Não foi possível registrar. As regras de segurança do Firestore precisam ser atualizadas antes do teste.");}
-    finally{button.disabled=false;button.textContent="Registrar solicitação";}
+    finally{button.disabled=false;button.textContent="Já fiz o pagamento — Solicitar entregador";}
   });
 
   async function loadUsers() {
