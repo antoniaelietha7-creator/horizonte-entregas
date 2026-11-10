@@ -96,6 +96,10 @@ body{background:#f3f4f9;color:#151827;font-family:Arial,"DM Sans",sans-serif}
 @media(max-width:700px){.top{height:70px;padding:4px 10px}.brand{font-size:19px}.brand-logo{width:76px;height:56px}.brand small{font-size:12px}.top:after{display:none}.top-actions{gap:5px}.top-actions .btn{padding:9px 10px;font-size:12px}.dashboard{padding:8px}.dash-inner{padding:10px;border-radius:14px}.dash-head{margin:-10px -10px 12px;padding:8px 12px;min-height:62px}.dash-head .brand{font-size:17px}.dash-head .brand-logo{width:68px;height:48px}.welcome{padding:14px;display:block}.welcome h2{font-size:20px}.store-panel,#courierPanel{padding:13px}.delivery-form{grid-template-columns:1fr}.delivery-form .span-2{grid-column:auto}.map-live{height:260px}.hero{padding:42px 18px}.hero h1{font-size:40px}.wrap{padding:30px 14px}}
 
 
+
+    .courier-alerts{display:flex;align-items:center;justify-content:space-between;gap:14px;flex-wrap:wrap;padding:15px 16px;margin:14px 0 18px;background:#fff8e8;border:1px solid #f0d99c;border-radius:14px}
+    .courier-alerts b,.courier-alerts small{display:block}.courier-alerts small{margin-top:4px;color:#687080;font-size:13px}
+    @media(max-width:600px){.courier-alerts{align-items:stretch}.courier-alerts .btn{width:100%}}
     .searching-box{display:flex;align-items:center;gap:12px;background:#fff5e6;border:1px solid #ffd58a;color:#7a4b00;border-radius:14px;padding:14px;margin:12px 0}
     .search-spinner{width:27px;height:27px;flex:0 0 27px;border:3px solid #ffd58a;border-top-color:#e30613;border-radius:50%;animation:searchSpin .8s linear infinite}
     @keyframes searchSpin{to{transform:rotate(360deg)}}
@@ -271,8 +275,13 @@ body{background:#f3f4f9;color:#151827;font-family:Arial,"DM Sans",sans-serif}
     <section id="courierPanel" class="hidden" style="margin-top:28px">
       <h2>🛵 Painel do entregador</h2>
       <p style="color:var(--muted)">As entregas disponíveis aparecem abaixo. Ao aceitar, a corrida fica vinculada somente à sua conta.</p>
+      <div class="courier-alerts">
+        <div><b>🔔 Alertas de novas entregas</b><small id="alertStatus">Som e notificações desativados.</small></div>
+        <button class="btn btn-primary" id="enableCourierAlerts" type="button">Ativar som e notificações</button>
+      </div>
       <h3>Entregas disponíveis</h3><button class="btn btn-outline" id="refreshOpen" type="button">Atualizar entregas</button><div id="openDeliveries"></div>
       <h3 style="margin-top:28px">Minha entrega aceita</h3><div id="myDelivery"></div>
+      <div class="notice">Para receber alertas sonoros e notificações, mantenha esta página aberta e ative os alertas acima. O som funciona enquanto o site estiver aberto. Para receber notificações com o site fechado, será necessária a configuração adicional do Firebase Cloud Messaging e de um service worker.</div>
       <div class="notice">Para compartilhar sua localização, mantenha esta página aberta e permita o acesso ao GPS. O rastreamento para quando a entrega for concluída ou quando você sair da conta.</div>
     </section>
 
@@ -344,6 +353,12 @@ body{background:#f3f4f9;color:#151827;font-family:Arial,"DM Sans",sans-serif}
   let courierUnsub = null;
   let courierMap = null;
   let courierMarker = null;
+  let courierOpenUnsub = null;
+  let courierAssignedUnsub = null;
+  let courierAlertsEnabled = false;
+  let previousOpenDeliveryIds = null;
+  let alertAudioContext = null;
+  const courierCardTimers = new Set();
   function setDeliveryStatus(message, type="error") {
     const el=$("deliveryStatus"); el.textContent=message; el.className="status "+type;
   }
@@ -631,39 +646,97 @@ body{background:#f3f4f9;color:#151827;font-family:Arial,"DM Sans",sans-serif}
     trackingUnsubs.set(id,unsub);
   }
 
-  async function loadCourierDeliveries(){
-    if(!currentCourier)return;
-    const open=$("openDeliveries"), mine=$("myDelivery");
-    open.innerHTML="<p>Carregando...</p>";mine.innerHTML="<p>Verificando sua entrega...</p>";
+  function playNewDeliverySound(){
     try{
-      const [available, assigned]=await Promise.all([
-        getDocs(query(collection(db,"deliveries"),where("status","==","open"),where("courierUid","==",null))),
-        getDocs(query(collection(db,"deliveries"),where("courierUid","==",currentCourier.uid),where("status","==","accepted")))
-      ]);
-      open.innerHTML="";
-      if(available.empty)open.innerHTML="<p>Nenhuma entrega disponível neste momento.</p>";
-      available.forEach(snap=>{const d=snap.data(),card=document.createElement("article");card.className="delivery-item";
-        const h=document.createElement("h3");h.textContent="Entrega para "+(d.neighborhood||"bairro não informado");
-        const p=document.createElement("p");p.textContent=`Retirada: ${d.pickupAddress||"—"}
+      const AudioCtx=window.AudioContext||window.webkitAudioContext;
+      if(!AudioCtx)return;
+      alertAudioContext=alertAudioContext||new AudioCtx();
+      if(alertAudioContext.state==="suspended")alertAudioContext.resume();
+      const now=alertAudioContext.currentTime;
+      [0,0.22].forEach((delay,index)=>{
+        const oscillator=alertAudioContext.createOscillator();
+        const gain=alertAudioContext.createGain();
+        oscillator.type="sine";oscillator.frequency.value=index?1046:784;
+        gain.gain.setValueAtTime(0.0001,now+delay);
+        gain.gain.exponentialRampToValueAtTime(0.22,now+delay+0.025);
+        gain.gain.exponentialRampToValueAtTime(0.0001,now+delay+0.18);
+        oscillator.connect(gain);gain.connect(alertAudioContext.destination);
+        oscillator.start(now+delay);oscillator.stop(now+delay+0.2);
+      });
+    }catch(error){console.warn("Não foi possível reproduzir o alerta sonoro.",error);}
+  }
+  function notifyNewDelivery(){
+    if(!courierAlertsEnabled)return;
+    playNewDeliverySound();
+    if("Notification" in window && Notification.permission==="granted"){
+      try{new Notification("Nova entrega disponível!",{body:"Abra a Horizonte Entregas para conferir e aceitar a corrida.",tag:"horizonte-nova-entrega"});}catch(error){console.warn(error);}
+    }
+  }
+  async function enableCourierAlerts(){
+    courierAlertsEnabled=true;
+    if("Notification" in window && Notification.permission==="default"){
+      try{await Notification.requestPermission();}catch(error){console.warn(error);}
+    }
+    const status=$("alertStatus");
+    if("Notification" in window){
+      status.textContent=Notification.permission==="granted"?"Som ativado e notificações autorizadas.":"Som ativado. Notificações não autorizadas pelo navegador.";
+    }else status.textContent="Som ativado. Este navegador não oferece notificações na tela.";
+    const button=$("enableCourierAlerts");button.textContent="✓ Alertas ativados";button.classList.remove("btn-primary");button.classList.add("btn-outline");
+    playNewDeliverySound();
+  }
+  function renderOpenCourierDeliveries(available){
+    courierCardTimers.forEach(timerId=>clearInterval(timerId));courierCardTimers.clear();
+    const open=$("openDeliveries");open.innerHTML="";
+    if(available.empty){open.innerHTML="<p>Nenhuma entrega disponível neste momento.</p>";return;}
+    available.forEach(snap=>{
+      const d=snap.data(),card=document.createElement("article");card.className="delivery-item";
+      const h=document.createElement("h3");h.textContent="Entrega para "+(d.neighborhood||"bairro não informado");
+      const p=document.createElement("p");p.textContent=`Retirada: ${d.pickupAddress||"—"}
 Destino: ${d.deliveryAddress||"—"}
 Recebedor: ${d.recipientName||"—"} · ${d.recipientPhone||"—"}
 Pedido: ${d.orderDescription||"—"}`;
-        const timer=document.createElement("p");timer.className="notice";timer.textContent="Prazo sugerido para aceitar: 04:00. Se o tempo terminar, a entrega continuará disponível.";let seconds=240;const timerId=setInterval(()=>{seconds=Math.max(0,seconds-1);timer.textContent=seconds>0?`Aceite em até ${String(Math.floor(seconds/60)).padStart(2,"0")}:${String(seconds%60).padStart(2,"0")}. Se o tempo terminar, a entrega continuará disponível.`:"Prazo de 4 minutos encerrado. A entrega continua disponível para aceite.";if(seconds===0)clearInterval(timerId);},1000);const b=document.createElement("button");b.className="btn btn-primary";b.textContent="Aceitar entrega";b.onclick=()=>acceptDelivery(snap.id,b);
-        card.append(h,p,timer,b);open.append(card);
-      });
-      mine.innerHTML="";
-      if(assigned.empty){mine.innerHTML="<p>Você ainda não aceitou nenhuma entrega.</p>";stopGps();}
-      assigned.forEach(snap=>{const d=snap.data(),card=document.createElement("article");card.className="delivery-item";
-        const h=document.createElement("h3");h.textContent="Entrega aceita — "+(d.neighborhood||"");
-        const p=document.createElement("p");p.textContent=`Retirada: ${d.pickupAddress||"—"}
+      const timer=document.createElement("p");timer.className="notice";timer.textContent="Prazo sugerido para aceitar: 04:00. Se o tempo terminar, a entrega continuará disponível.";
+      let seconds=240;const timerId=setInterval(()=>{seconds=Math.max(0,seconds-1);timer.textContent=seconds>0?`Aceite em até ${String(Math.floor(seconds/60)).padStart(2,"0")}:${String(seconds%60).padStart(2,"0")}. Se o tempo terminar, a entrega continuará disponível.`:"Prazo de 4 minutos encerrado. A entrega continua disponível para aceite.";if(seconds===0){clearInterval(timerId);courierCardTimers.delete(timerId);}},1000);courierCardTimers.add(timerId);
+      const b=document.createElement("button");b.className="btn btn-primary";b.textContent="Aceitar entrega";b.onclick=()=>{clearInterval(timerId);acceptDelivery(snap.id,b);};
+      card.append(h,p,timer,b);open.append(card);
+    });
+  }
+  function renderAssignedCourierDeliveries(assigned){
+    const mine=$("myDelivery");mine.innerHTML="";
+    if(assigned.empty){mine.innerHTML="<p>Você ainda não aceitou nenhuma entrega.</p>";stopGps();return;}
+    assigned.forEach(snap=>{
+      const d=snap.data(),card=document.createElement("article");card.className="delivery-item";
+      const h=document.createElement("h3");h.textContent="Entrega aceita — "+(d.neighborhood||"");
+      const p=document.createElement("p");p.textContent=`Retirada: ${d.pickupAddress||"—"}
 Destino: ${d.deliveryAddress||"—"}
 Loja: ${d.storeName||"—"}`;
-        const gps=document.createElement("p");gps.id="gpsStatus";gps.textContent="Ative o GPS para compartilhar sua localização.";
-        const start=document.createElement("button");start.className="btn btn-light";start.textContent="Ativar / atualizar GPS";start.onclick=()=>startGps(snap.id,gps);
-        const done=document.createElement("button");done.className="btn btn-primary";done.textContent="Concluir entrega";done.onclick=()=>completeDelivery(snap.id,done);
-        card.append(h,p,gps,start,done);mine.append(card);
-        if(!gpsWatch)startGps(snap.id,gps);
-      });
+      const gps=document.createElement("p");gps.id="gpsStatus";gps.textContent="Ative o GPS para compartilhar sua localização.";
+      const start=document.createElement("button");start.className="btn btn-light";start.textContent="Ativar / atualizar GPS";start.onclick=()=>startGps(snap.id,gps);
+      const done=document.createElement("button");done.className="btn btn-primary";done.textContent="Concluir entrega";done.onclick=()=>completeDelivery(snap.id,done);
+      card.append(h,p,gps,start,done);mine.append(card);
+      if(!gpsWatch)startGps(snap.id,gps);
+    });
+  }
+  async function loadCourierDeliveries(){
+    if(!currentCourier)return;
+    const open=$("openDeliveries"),mine=$("myDelivery");
+    open.innerHTML="<p>Conectando às entregas disponíveis...</p>";mine.innerHTML="<p>Verificando sua entrega...</p>";
+    if(courierOpenUnsub){courierOpenUnsub();courierOpenUnsub=null;}
+    if(courierAssignedUnsub){courierAssignedUnsub();courierAssignedUnsub=null;}
+    try{
+      const availableQuery=query(collection(db,"deliveries"),where("status","==","open"),where("courierUid","==",null));
+      const assignedQuery=query(collection(db,"deliveries"),where("courierUid","==",currentCourier.uid),where("status","==","accepted"));
+      previousOpenDeliveryIds=null;
+      courierOpenUnsub=onSnapshot(availableQuery,snapshot=>{
+        const currentIds=new Set(snapshot.docs.map(item=>item.id));
+        if(previousOpenDeliveryIds!==null){
+          const hasNew=[...currentIds].some(id=>!previousOpenDeliveryIds.has(id));
+          if(hasNew)notifyNewDelivery();
+        }
+        previousOpenDeliveryIds=currentIds;
+        renderOpenCourierDeliveries(snapshot);
+      },error=>{open.innerHTML="<p>Não foi possível acompanhar novas entregas. Verifique as regras do Firestore.</p>";console.error(error);});
+      courierAssignedUnsub=onSnapshot(assignedQuery,renderAssignedCourierDeliveries,error=>{mine.innerHTML="<p>Não foi possível atualizar sua entrega.</p>";console.error(error);});
     }catch(error){open.innerHTML="<p>Não foi possível carregar. Verifique as regras do Firestore e se o cadastro está aprovado.</p>";mine.innerHTML="";}
   }
 
@@ -696,6 +769,7 @@ Loja: ${d.storeName||"—"}`;
     catch(error){alert("Não foi possível concluir. Tente novamente.");button.disabled=false;}
   }
   $("refreshOpen").addEventListener("click",loadCourierDeliveries);
+  $("enableCourierAlerts").addEventListener("click",enableCourierAlerts);
 
   $("savePickupAddress").addEventListener("click", async ()=>{
     const address=$("editPickupAddress").value.trim();
@@ -799,6 +873,9 @@ Loja: ${d.storeName||"—"}`;
   }));
   $("logout").addEventListener("click", async () => {
     stopGps(); trackingUnsubs.forEach(fn=>fn()); trackingUnsubs.clear();
+    if(courierOpenUnsub){courierOpenUnsub();courierOpenUnsub=null;}
+    if(courierAssignedUnsub){courierAssignedUnsub();courierAssignedUnsub=null;}
+    currentCourier=null;previousOpenDeliveryIds=null;courierAlertsEnabled=false;
     await signOut(auth);
     $("dashboard").style.display = "none";
     $("storePanel").classList.add("hidden");
