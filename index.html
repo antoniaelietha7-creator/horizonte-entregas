@@ -250,7 +250,7 @@ body{background:#f3f4f9;color:#151827;font-family:Arial,"DM Sans",sans-serif}
     <aside class="app-sidebar" aria-label="Menu principal">
       <button class="side-link active" type="button" data-target="storePanel"><span>⌂</span> Painel da Loja</button>
       <button class="side-link" type="button" data-target="deliveryList"><span>▣</span> Minhas Entregas</button>
-      <button class="side-link" type="button" data-target="storePanel"><span>▤</span> Perfil da Loja</button>
+      <button class="side-link" type="button" data-target="storeProfilePanel"><span>▤</span> Perfil da Loja</button>
       <button class="side-link" type="button" data-target="supportInfo"><span>◉</span> Suporte</button>
       <button class="side-link side-exit" type="button" id="sideLogout"><span>⇥</span> Sair</button>
     </aside>
@@ -267,12 +267,11 @@ body{background:#f3f4f9;color:#151827;font-family:Arial,"DM Sans",sans-serif}
       <h2>🏪 Painel da loja</h2>
       <p class="muted">Preencha os dados para registrar uma nova solicitação de entrega. Nesta etapa, ela ficará registrada para acompanhamento administrativo.</p>
       <form id="deliveryForm" class="delivery-form">
-        <div class="span-2"><div class="fee-preview" id="storePickupAddress">Endereço de retirada cadastrado: carregando...</div><label for="editPickupAddress">Atualizar endereço da loja (somente se necessário)</label><input id="editPickupAddress" maxlength="220" placeholder="Rua, número, bairro e referência"><button class="btn btn-light" id="savePickupAddress" type="button" style="margin-top:8px">Salvar endereço da loja</button><div id="pickupAddressStatus" class="status"></div></div>
+        <div class="span-2"><div class="fee-preview" id="storePickupAddress">Endereço de retirada cadastrado: carregando...</div></div>
         <div><label for="recipientName">Nome de quem vai receber</label><input id="recipientName" maxlength="100" required placeholder="Nome do destinatário"></div>
         <div><label for="recipientPhone">Telefone de quem vai receber</label><input id="recipientPhone" type="tel" maxlength="20" required placeholder="(85) 99999-9999"></div>
         <div class="span-2"><label for="deliveryAddress">Endereço de entrega</label><input id="deliveryAddress" maxlength="220" required placeholder="Rua, número e referência"></div>
         <div class="span-2"><label for="neighborhood">Bairro de destino</label><select id="neighborhood" required><option value="">Selecione o bairro</option></select></div>
-        <div class="span-2"><label for="orderDescription">O que será entregue?</label><input id="orderDescription" maxlength="220" required placeholder="Ex.: pedido de comida, documento, pacote"></div>
         <div class="span-2"><label for="deliveryNotes">Observações (opcional)</label><input id="deliveryNotes" maxlength="300" placeholder="Ponto de referência ou orientação ao entregador"></div>
         <div class="span-2 fee-preview" id="feePreview">Selecione o bairro para visualizar a taxa estimada.</div>
         <div class="span-2 pix-panel hidden" id="pixPaymentPanel">
@@ -285,11 +284,21 @@ body{background:#f3f4f9;color:#151827;font-family:Arial,"DM Sans",sans-serif}
           <div class="action-row"><button class="btn btn-outline full" id="copyPixCode" type="button">Copiar código Pix</button></div>
           <div class="pix-warning"><b>AVISO IMPORTANTE — ACOMPANHAMENTO E ESTORNO</b><br>
           Nossa plataforma acompanha, por meio do mapa, o deslocamento do entregador desde a saída até o destino final, enquanto a localização estiver disponível. Caso a entrega não seja realizada, a ocorrência será analisada com base nos registros de acompanhamento e, sendo constatada a não realização, será realizado o estorno do valor pago à plataforma.</div>
-          <p class="muted">Após realizar o Pix, volte a esta tela e toque no botão abaixo. O site registrará apenas sua declaração de pagamento; não haverá confirmação automática junto ao banco.</p>
+          <p class="muted">Após realizar o Pix, volte a esta tela e toque no botão abaixo para solicitar o entregador.</p>
         </div>
         <div class="span-2"><button class="btn btn-primary full" id="submitDelivery" type="submit" disabled>Já fiz o pagamento — Solicitar entregador</button><div id="deliveryStatus" class="status" role="status"></div></div>
       </form>
       <div style="margin-top:26px"><h3>Minhas solicitações</h3><p class="muted">Aqui aparecerão os pedidos de entrega registrados por esta loja.</p><button class="btn btn-outline" id="refreshDeliveries" type="button">Atualizar solicitações</button><div id="deliveryList" class="delivery-list"></div></div>
+    </section>
+
+    <section id="storeProfilePanel" class="store-panel hidden" style="margin-top:28px">
+      <h2>🏪 Perfil da Loja</h2>
+      <p class="muted">Consulte e atualize o endereço de retirada cadastrado para sua loja. Esse endereço será usado nas próximas solicitações de entrega.</p>
+      <div class="span-2"><div class="fee-preview" id="profilePickupAddress">Endereço de retirada cadastrado: carregando...</div></div>
+      <label for="editPickupAddress">Endereço da loja</label>
+      <input id="editPickupAddress" maxlength="220" placeholder="Rua, número, bairro e referência">
+      <button class="btn btn-light" id="savePickupAddress" type="button" style="margin-top:8px">Salvar endereço da loja</button>
+      <div id="pickupAddressStatus" class="status" role="status"></div>
     </section>
 
     <section id="courierPanel" class="hidden" style="margin-top:28px">
@@ -559,6 +568,7 @@ body{background:#f3f4f9;color:#151827;font-family:Arial,"DM Sans",sans-serif}
       if(currentStore){
         setupNeighborhoods();
         $("storePickupAddress").textContent = currentStore.pickupAddress ? `Retirada: ${currentStore.pickupAddress}` : "Endereço de retirada ainda não cadastrado.";
+        $("profilePickupAddress").textContent = currentStore.pickupAddress ? `Endereço atual: ${currentStore.pickupAddress}` : "Endereço de retirada ainda não cadastrado.";
         $("editPickupAddress").value = currentStore.pickupAddress;
         $("storePanel").classList.remove("hidden");
         $("regularNotice").classList.add("hidden");
@@ -818,6 +828,7 @@ Loja: ${d.storeName||"—"}`;
       await updateDoc(doc(db,"users",currentStore.uid),{pickupAddress:address});
       currentStore.pickupAddress=address;
       $("storePickupAddress").textContent=`Retirada: ${address}`;
+      $("profilePickupAddress").textContent=`Endereço atual: ${address}`;
       status.textContent="Endereço salvo. Ele será usado automaticamente nas próximas entregas.";status.className="status ok";
     }catch(error){status.textContent="Não foi possível salvar. Publique primeiro as novas regras do Firestore.";status.className="status error";}
   });
@@ -846,7 +857,7 @@ Loja: ${d.storeName||"—"}`;
         pickupAddress:currentStore.pickupAddress,
         recipientName:$("recipientName").value.trim(),recipientPhone:$("recipientPhone").value.trim(),
         deliveryAddress:$("deliveryAddress").value.trim(),neighborhood,
-        orderDescription:$("orderDescription").value.trim(),deliveryNotes:$("deliveryNotes").value.trim(),
+        deliveryNotes:$("deliveryNotes").value.trim(),
         status:"open",courierUid:null,
         deliveryFee:NEIGHBORHOOD_FEES[neighborhood],
         paymentMethod:"pix_qr_static",
@@ -923,6 +934,7 @@ Loja: ${d.storeName||"—"}`;
     document.querySelectorAll(".side-link").forEach(item => item.classList.remove("active"));
     button.classList.add("active");
     const target = document.getElementById(button.dataset.target);
+    if(target?.id === "storeProfilePanel") target.classList.remove("hidden");
     target?.scrollIntoView({behavior:"smooth",block:"start"});
   }));
   $("logout").addEventListener("click", async () => {
